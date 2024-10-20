@@ -1,37 +1,56 @@
 import React, { useEffect, useState } from "react";
 import { getAccessToken, getAssetListCount } from "../Api";
-import clients from "../Utils/clients";
+import clientsEnv from "../Utils/clientsEnv";
 import timeFilter from "../Utils/timeFilter";
 import moment from "moment";
-function MaintananceCount() {
+
+function MaintenanceCount() {
   const [assetListCounts, setAssetListCounts] = useState([]);
+  const [fetchingClient, setFetchingClient] = useState(null);
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
   useEffect(() => {
-    const fetchData = async () => {
-      const expirationTime = localStorage.getItem("expirationTime");
-      let token = localStorage.getItem("accessToken");
-      if (expirationTime < moment().clone().subtract(5, "minutes").valueOf()) {
-        console.log("calling token api");
-        token = await getAccessToken();
-      }
-      const results = await Promise.all(
-        clients.map(async (client) => {
-          console.log(client);
-
-          const assetData = await getAssetListCount(
-            token,
-            client.searchLabel,
-            client.clientDomain,
-            timeFilter
-          );
-          console.log(assetData.result.lessCommunicating);
-          return { client: client.clientDomain, data: assetData.result };
-        })
-      );
-      setAssetListCounts(results);
-    };
-
+    console.log("calling useEffect ");
     fetchData();
   }, []);
+
+  const fetchData = async () => {
+    for (const env of clientsEnv) {
+    let localToken = localStorage.getItem("accessToken");
+
+    if (
+      !localToken
+    ) {
+      console.log("Calling token API");
+      localToken = await getAccessToken(env.graphqlURL,env.username,env.password);
+    }
+      const clients = env.clients;
+      for (const client of clients) {
+        console.log(
+          `<----------------------started fetching list ${client.clientDomain} in ${env.name}------------------------------------------------>`
+        );
+        setFetchingClient(client.clientDomain);
+        await delay(5000); // Simulate delay for fetching data
+        const assetData = await getAssetListCount(
+          env.graphqlURL,
+          localToken,
+          client.searchLabel,
+          client.clientDomain,
+          timeFilter
+        );
+        console.log(assetData)
+        console.log(
+          `<----------------------completed fetching list ${client.clientDomain} in ${env.name}------------------------------------------------>`
+        );
+        setAssetListCounts((prevCounts) => [
+          ...prevCounts,
+          { client: client.clientDomain, data: assetData.result, env: env.name },
+        ]);
+        setFetchingClient(null);
+      }
+      localStorage.removeItem("accessToken");
+    }
+  };
 
   return (
     <div className="container mt-5">
@@ -45,6 +64,7 @@ function MaintananceCount() {
           <table className="table table-striped table-bordered table-hover">
             <thead className="thead-dark">
               <tr>
+                <th className="text-center">Environment</th>
                 <th className="text-center">Client Name</th>
                 <th className="text-center bg-primary text-white">
                   Total Connected Assets
@@ -62,8 +82,11 @@ function MaintananceCount() {
               </tr>
             </thead>
             <tbody>
-              {assetListCounts.map((clientData) => (
-                <tr key={clientData.client}>
+              {assetListCounts.map((clientData, index) => (
+                <tr key={index}>
+                  <td className="text-center font-weight-bold">
+                    {clientData.env} {/* Show environment name */}
+                  </td>
                   <td className="text-center font-weight-bold">
                     {clientData.client}
                   </td>
@@ -84,6 +107,13 @@ function MaintananceCount() {
                   </td>
                 </tr>
               ))}
+              {fetchingClient && (
+                <tr>
+                  <td colSpan="7" className="text-center mt-3">
+                    Fetching data for {fetchingClient}...
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         ) : (
@@ -98,4 +128,4 @@ function MaintananceCount() {
   );
 }
 
-export default MaintananceCount;
+export default MaintenanceCount;

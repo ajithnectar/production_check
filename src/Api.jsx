@@ -1,47 +1,39 @@
 
 import { request, gql } from 'graphql-request';
-const LOGIN_ENDPOINT = 'https://assets.nectarit.com:444/api/graphql';
 const loginQuery = gql`
   query login($credentials: JSON, $isDevMode: Boolean) {\n
     login(credentials: $credentials, isDevMode: $isDevMode\n) \n
   }
 `;
-export const login = async () => {
+export const login = async (url ,username , password) => {
   const variables = {
     credentials: {
-      userName: "riyas@nectarit",
-      password: "HoneyBee@2025",
+      userName: username,
+      password: password,
     },
     isDevMode: false,
   };
 
   try {
-    console.log("here")
-    const response = await request(LOGIN_ENDPOINT, loginQuery, variables);
+    console.log("<----------------------started fetching token ------------------------------------------------>")
+    const response = await request(url, loginQuery, variables);
     const accessToken = response.login.accessToken;
     const expiresIn = 3600;
     const expirationTime = Date.now() + expiresIn * 1000;
 
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('expirationTime', expirationTime.toString());
-
-    console.log(accessToken);
+    console.log("<----------------------completed fetching token ------------------------------------------------>")
     return { accessToken};
   } catch (error) {
     console.error('Error during login:', error);
     throw error;
   }
 };
-export const getAccessToken = async () => {
-  const storedToken = localStorage.getItem('accessToken');
-  const storedExpirationTime = localStorage.getItem('expirationTime');
-
-  if (!storedToken || Date.now() >= Number(storedExpirationTime)) {
-    const tokenData = await login();
-    return tokenData.accessToken;
-  }
-
-  return storedToken;
+export const getAccessToken = async (url ,username , password) => {
+  console.log(url  , "---------------------------------------->")
+  const tokenData = await login(url ,username , password);
+  return tokenData.accessToken;
 };
 
 
@@ -53,8 +45,7 @@ const ASSET_LIST_COUNT_QUERY = gql`
   }
 `;
 
-export const getAssetListCount = async (token ,searchLabel,clientDomain ,timeFilter) => {
-  console.log(token,searchLabel,clientDomain,timeFilter)
+export const getAssetListCount = async (url,token ,searchLabel,clientDomain ,timeFilter) => {
   const variables = {
     filter: {
       searchLabel: searchLabel,
@@ -65,7 +56,7 @@ export const getAssetListCount = async (token ,searchLabel,clientDomain ,timeFil
 
   try {
     const response = await request(
-      LOGIN_ENDPOINT,
+      url,
       ASSET_LIST_COUNT_QUERY,
       variables,
       {
