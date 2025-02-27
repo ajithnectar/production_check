@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState} from "react";
 import { getAccessToken, getAssetListCount } from "../Api";
 import clientsEnv from "../Utils/clientsEnv";
 import timeFilter from "../Utils/timeFilter";
-import moment from "moment";
+import * as XLSX from "xlsx/xlsx.mjs";
 
 function MaintenanceCount() {
   const [assetListCounts, setAssetListCounts] = useState([]);
@@ -16,21 +16,23 @@ function MaintenanceCount() {
 
   const fetchData = async () => {
     for (const env of clientsEnv) {
-    let localToken = localStorage.getItem("accessToken");
+      let localToken = localStorage.getItem("accessToken");
 
-    if (
-      !localToken
-    ) {
-      console.log("Calling token API");
-      localToken = await getAccessToken(env.graphqlURL,env.username,env.password);
-    }
+      if (!localToken) {
+        console.log("Calling token API");
+        localToken = await getAccessToken(
+          env.graphqlURL,
+          env.username,
+          env.password
+        );
+      }
       const clients = env.clients;
       for (const client of clients) {
         console.log(
           `<----------------------started fetching list ${client.clientDomain} in ${env.name}------------------------------------------------>`
         );
         setFetchingClient(client.clientDomain);
-        await delay(5000); // Simulate delay for fetching data
+        await delay(5000);
         const assetData = await getAssetListCount(
           env.graphqlURL,
           localToken,
@@ -38,18 +40,61 @@ function MaintenanceCount() {
           client.clientDomain,
           timeFilter
         );
-        console.log(assetData)
+        console.log(assetData);
         console.log(
           `<----------------------completed fetching list ${client.clientDomain} in ${env.name}------------------------------------------------>`
         );
         setAssetListCounts((prevCounts) => [
           ...prevCounts,
-          { client: client.clientDomain, data: assetData.result, env: env.name },
+          {
+            client: client.clientDomain,
+            data: assetData.result,
+            env: env.name,
+          },
         ]);
         setFetchingClient(null);
+
+        localStorage.removeItem("accessToken");
       }
-      localStorage.removeItem("accessToken");
     }
+  };
+  const handleExport = () => {
+    console.log(assetListCounts);
+
+    if (!assetListCounts.length) {
+      console.error("No data available to export.");
+      return;
+    }
+
+    // Transforming data for Excel
+    const exportData = assetListCounts.map((item) => ({
+      Client: item.client,
+      Environment: item.env,
+      "Under Maintenance": item.data?.underMaintenance ?? 0,
+      Total: item.data?.total ?? 0,
+      "Not Communicating": item.data?.notCommunicating ?? 0,
+      "Less Communicating": item.data?.lessCommunicating ?? 0,
+      "Not Connected": item.data?.notConnected ?? 0,
+      Communicating: item.data?.frequentlyCommunicating ?? 0,
+    }));
+
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.json_to_sheet(exportData);
+
+    // Auto-adjust column width for better visibility
+    ws["!cols"] = [
+      { wch: 20 }, // Client
+      { wch: 15 }, // Environment
+      { wch: 20 }, // Under Maintenance
+      { wch: 10 }, // Total
+      { wch: 20 }, // Not Communicating
+      { wch: 20 }, // Less Communicating
+      { wch: 15 }, // Not Connected
+      { wch: 20 }, //Communicating
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, "Client Data");
+    XLSX.writeFile(wb, "Client_Report.xlsx");
   };
 
   return (
@@ -59,6 +104,7 @@ function MaintenanceCount() {
         rel="stylesheet"
       />
       <h1 className="text-center mb-4">Asset List Count</h1>
+      <button className="btn" onClick={handleExport} >Export</button>
       <div className="table-responsive">
         {assetListCounts.length > 0 ? (
           <table className="table table-striped table-bordered table-hover">
