@@ -45,12 +45,14 @@ const ASSET_LIST_COUNT_QUERY = gql`
   }
 `;
 
-export const getAssetListCount = async (url,token ,searchLabel,clientDomain ,timeFilter) => {
+export const getAssetListCount = async (url,token ,searchLabel,clientDomain ,timeFilter,types,make) => {
   const variables = {
     filter: {
       searchLabel: searchLabel,
       clientDomain:clientDomain,
-      timeFilter:timeFilter 
+      timeFilter:timeFilter,
+      type:types,
+      make:make
     },
   };
 
@@ -67,4 +69,6 @@ export const getAssetListCount = async (url,token ,searchLabel,clientDomain ,tim
   } catch (error) {
     console.error('Error fetching asset list count:', error);
   }
+
 };
+

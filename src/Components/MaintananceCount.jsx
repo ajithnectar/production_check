@@ -1,8 +1,8 @@
-import React, { useEffect, useState} from "react";
+import React, { useEffect, useState } from "react";
 import { getAccessToken, getAssetListCount } from "../Api";
 import clientsEnv from "../Utils/clientsEnv";
 import timeFilter from "../Utils/timeFilter";
-import * as XLSX from "xlsx/xlsx.mjs";
+import * as XLSX from "xlsx";
 
 function MaintenanceCount() {
   const [assetListCounts, setAssetListCounts] = useState([]);
@@ -38,7 +38,9 @@ function MaintenanceCount() {
           localToken,
           client.searchLabel,
           client.clientDomain,
-          timeFilter
+          timeFilter,
+          client.type,
+          client.make
         );
         console.log(assetData);
         console.log(
@@ -60,13 +62,12 @@ function MaintenanceCount() {
   };
   const handleExport = () => {
     console.log(assetListCounts);
-
+  
     if (!assetListCounts.length) {
       console.error("No data available to export.");
       return;
     }
-
-    // Transforming data for Excel
+  
     const exportData = assetListCounts.map((item) => ({
       Client: item.client,
       Environment: item.env,
@@ -77,22 +78,34 @@ function MaintenanceCount() {
       "Not Connected": item.data?.notConnected ?? 0,
       Communicating: item.data?.frequentlyCommunicating ?? 0,
     }));
-
+  
     var wb = XLSX.utils.book_new();
     var ws = XLSX.utils.json_to_sheet(exportData);
-
-    // Auto-adjust column width for better visibility
+  
+    // Get range
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      let cell_address = XLSX.utils.encode_cell({ r: 0, c: col });
+      if (!ws[cell_address]) continue;
+      
+      ws[cell_address].s = {
+        fill: { fgColor: { rgb: "FFFF00" } }, // Yellow background
+        font: { bold: true, color: { rgb: "000000" } }, // Black text
+        alignment: { horizontal: "center" },
+      };
+    }
+  
     ws["!cols"] = [
-      { wch: 20 }, // Client
-      { wch: 15 }, // Environment
-      { wch: 20 }, // Under Maintenance
-      { wch: 10 }, // Total
-      { wch: 20 }, // Not Communicating
-      { wch: 20 }, // Less Communicating
-      { wch: 15 }, // Not Connected
-      { wch: 20 }, //Communicating
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 10 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 20 },
     ];
-
+  
     XLSX.utils.book_append_sheet(wb, ws, "Client Data");
     XLSX.writeFile(wb, "Client_Report.xlsx");
   };
@@ -104,7 +117,9 @@ function MaintenanceCount() {
         rel="stylesheet"
       />
       <h1 className="text-center mb-4">Asset List Count</h1>
-      <button className="btn" onClick={handleExport} >Export</button>
+      <button className="btn" onClick={handleExport}>
+        Export
+      </button>
       <div className="table-responsive">
         {assetListCounts.length > 0 ? (
           <table className="table table-striped table-bordered table-hover">
